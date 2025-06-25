@@ -1,12 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-06-20",
-})
+function getStripe() {
+  const key = process.env.STRIPE_SECRET_KEY
+  if (!key) {
+    throw new Error("Missing STRIPE_SECRET_KEY environment variable")
+  }
+  return new Stripe(key, { apiVersion: "2024-06-20" })
+}
 
 export async function POST(request: NextRequest) {
   try {
+    const stripe = getStripe()
     const { email } = await request.json()
 
     if (!email) {
