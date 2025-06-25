@@ -11,6 +11,12 @@ function getStripe() {
 
 export async function POST(request: NextRequest) {
   try {
+    // Payment functionality is currently disabled. The assessment is now free!
+    return NextResponse.json(
+      { error: "Payment functionality is currently disabled. The assessment is now free!" },
+      { status: 503 },
+    )
+
     const stripe = getStripe()
     const { email } = await request.json()
 

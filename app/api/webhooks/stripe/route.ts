@@ -2,20 +2,36 @@ import { type NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 import { headers } from "next/headers"
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-06-20",
-})
-
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
+/**
+ * Lazy Stripe helper – prevents build-time crashes when env vars
+ * are unavailable.
+ */
+function getStripe() {
+  const key = process.env.STRIPE_SECRET_KEY
+  if (!key) {
+    throw new Error("Missing STRIPE_SECRET_KEY environment variable")
+  }
+  return new Stripe(key, { apiVersion: "2024-06-20" })
+}
 
 export async function POST(request: NextRequest) {
+  // Stripe webhooks are disabled
+  return NextResponse.json({ error: "Stripe webhooks are disabled" }, { status: 503 })
+
   try {
+    const stripe = getStripe()
+
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+    if (!webhookSecret) {
+      throw new Error("Missing STRIPE_WEBHOOK_SECRET environment variable")
+    }
+
+    // Grab raw text & signature
     const body = await request.text()
-    const headersList = headers()
-    const signature = headersList.get("stripe-signature")!
+    const signature = headers().get("stripe-signature")!
 
+    // Verify the event
     let event: Stripe.Event
-
     try {
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
     } catch (err) {
@@ -23,18 +39,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
     }
 
+    // Handle the checkout completion
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session
       const email = session.customer_email || session.metadata?.email
 
       if (email) {
-        // Generate a secure token for the assessment
         const token = generateSecureToken()
-
-        // Store the user and token in database (you would implement this)
         await storeUserAssessmentToken(email, token)
-
-        // Send email with assessment link
         await sendAssessmentEmail(email, token)
       }
     }
@@ -46,23 +58,21 @@ export async function POST(request: NextRequest) {
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/*                               Helper functions                             */
+/* -------------------------------------------------------------------------- */
+
 function generateSecureToken(): string {
   return Math.random().toString(36).substring(2) + Date.now().toString(36)
 }
 
 async function storeUserAssessmentToken(email: string, token: string) {
-  // In a real app, you would store this in your database
-  // For now, we'll just log it
+  // TODO: Persist to your database
   console.log(`Storing token for ${email}: ${token}`)
 }
 
 async function sendAssessmentEmail(email: string, token: string) {
-  // In a real app, you would use an email service like Resend, SendGrid, etc.
-  // For now, we'll just log it
-  console.log(`Sending assessment email to ${email} with token: ${token}`)
-
   const assessmentUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/assessment/${token}`
-
-  // Email content would be sent here
-  console.log(`Assessment URL: ${assessmentUrl}`)
+  // TODO: Send real email via your provider
+  console.log(`Sending assessment email to ${email}: ${assessmentUrl}`)
 }

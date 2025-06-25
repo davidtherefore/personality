@@ -1,7 +1,8 @@
 "use client"
 
 import type React from "react"
-
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,6 +16,12 @@ export default function CheckoutPage() {
   const [email, setEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
+  const router = useRouter()
+
+  useEffect(() => {
+    // Redirect to free assessment since Stripe is disabled
+    router.push("/assessment")
+  }, [router])
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault()
